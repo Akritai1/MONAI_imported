@@ -18,7 +18,7 @@ from parameterized import parameterized
 
 from monai.networks import eval_mode
 from monai.networks.nets.regunet import LocalNet
-from tests.test_utils import test_script_save
+from tests.test_utils import test_export_save
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -75,11 +75,11 @@ class TestLocalNet(unittest.TestCase):
         self.assertEqual(len(net.decode_deconvs), len(input_param["extract_levels"]) - 1)
         self.assertEqual(len(net.decode_convs), len(input_param["extract_levels"]) - 1)
 
-    def test_script(self):
+    def test_export(self):
         input_param, input_shape, _ = TEST_CASE_LOCALNET_2D[0]
         net = LocalNet(**input_param)
         test_data = torch.randn(input_shape)
-        test_script_save(net, test_data)
+        test_export_save(net, test_data)
 
 
 if __name__ == "__main__":
