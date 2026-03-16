@@ -77,6 +77,7 @@ from .synthetic import create_test_image_2d, create_test_image_3d
 from .test_time_augmentation import TestTimeAugmentation
 from .thread_buffer import ThreadBuffer, ThreadDataLoader
 from .torchscript_utils import load_net_with_metadata, save_net_with_metadata
+from .export_utils import load_exported_program, save_exported_program
 from .utils import (
     affine_to_spacing,
     compute_importance_map,
