@@ -20,7 +20,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from monai.losses import GeneralizedWassersteinDiceLoss
-from tests.test_utils import test_export_save
+from tests.test_utils import test_script_save
 
 
 class TestGeneralizedWassersteinDiceLoss(unittest.TestCase):
@@ -303,7 +303,7 @@ class TestGeneralizedWassersteinDiceLoss(unittest.TestCase):
                 float(loss_batch[1]), loss_b, places=5, msg=f"Batch loss[1] != loss_b for weighting_mode={w_mode}"
             )
 
-    def test_export(self):
+    def test_script(self):
         target = torch.tensor([[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0], [0, 0, 0, 0]])
 
         # add another dimension corresponding to the batch (batch size = 1 here)
@@ -312,7 +312,7 @@ class TestGeneralizedWassersteinDiceLoss(unittest.TestCase):
 
         loss = GeneralizedWassersteinDiceLoss(dist_matrix=np.array([[0.0, 1.0], [1.0, 0.0]]), weighting_mode="default")
 
-        test_export_save(loss, pred_very_good, target)
+        test_script_save(loss, pred_very_good, target)
 
 
 if __name__ == "__main__":

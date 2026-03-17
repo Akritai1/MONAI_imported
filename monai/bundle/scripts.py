@@ -719,6 +719,9 @@ def load(
     net_override = {} if net_override is None else net_override
     copy_model_args = {} if copy_model_args is None else copy_model_args
 
+    if load_ts_module and load_exported_module:
+        raise ValueError("load_ts_module and load_exported_module are mutually exclusive.")
+
     if load_ts_module:
         warnings.warn(
             "load_ts_module is deprecated since v1.5 and will be removed in v1.7. "
@@ -788,16 +791,12 @@ def load(
             )
         else:
             warnings.warn(
-                f"Cannot find the config file: {bundle_config_file}, return state dict instead.",
-                stacklevel=2,
+                f"Cannot find the config file: {bundle_config_file}, return state dict instead.", stacklevel=2
             )
             return model_dict
         if _workflow is not None:
             if not hasattr(_workflow, "network_def"):
-                warnings.warn(
-                    "No available network definition in the bundle, return state dict instead.",
-                    stacklevel=2,
-                )
+                warnings.warn("No available network definition in the bundle, return state dict instead.", stacklevel=2)
                 return model_dict
             else:
                 model = _workflow.network_def
@@ -1698,8 +1697,9 @@ def export_checkpoint(
     parser = ConfigParser()
     parser.read_config(f=config_file_)
     meta_file_ = os.path.join(bundle_root, "configs", "metadata.json") if meta_file_ is None else meta_file_
-    if os.path.exists(meta_file_):
-        parser.read_meta(f=meta_file_)
+    for mf in ensure_tuple(meta_file_):
+        if os.path.exists(mf):
+            parser.read_meta(f=mf)
 
     for k, v in _args.items():
         parser[k] = v
@@ -1906,10 +1906,13 @@ def trt_export(
     converter_kwargs_.update(trt_api_parameters)
 
     def _save_trt_model(trt_obj, filepath, **kwargs):
-        """Save TRT model without triggering deprecation warnings from internal calls."""
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=FutureWarning, message=".*save_net_with_metadata.*")
-            save_net_with_metadata(trt_obj, filepath, include_config_vals=False, append_timestamp=False, **kwargs)
+        """Save TRT model, using the appropriate format for dynamo vs JIT objects."""
+        if isinstance(trt_obj, torch.export.ExportedProgram):
+            save_exported_program(trt_obj, filepath, include_config_vals=False, append_timestamp=False, **kwargs)
+        else:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=FutureWarning, message=".*save_net_with_metadata.*")
+                save_net_with_metadata(trt_obj, filepath, include_config_vals=False, append_timestamp=False, **kwargs)
 
     _export(
         convert_to_trt,

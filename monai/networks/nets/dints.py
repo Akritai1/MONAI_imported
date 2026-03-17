@@ -376,8 +376,7 @@ class DiNTS(nn.Module):
         # Pre-compute node activation flags as Python booleans for torch.export compatibility.
         # NOTE: node_a must not be mutated after construction.
         self._node_flags: list[list[bool]] = [
-            [bool(self.node_a[b, d]) for d in range(self.num_depths)]
-            for b in range(self.node_a.shape[0])
+            [bool(self.node_a[b, d]) for d in range(self.num_depths)] for b in range(self.node_a.shape[0])
         ]
 
         # define stem operations for every block
@@ -675,8 +674,7 @@ class TopologyInstance(TopologyConstruction):
         # NOTE: arch_code_a must not be mutated after construction; this class
         # is only used at inference/re-training time, not during architecture search.
         self._active_flags: list[list[bool]] = [
-            [bool(self.arch_code_a[b, r]) for r in range(self.arch_code_a.shape[1])]
-            for b in range(self.num_blocks)
+            [bool(self.arch_code_a[b, r]) for r in range(self.arch_code_a.shape[1])] for b in range(self.num_blocks)
         ]
 
     def forward(self, x: list[torch.Tensor]) -> list[torch.Tensor]:

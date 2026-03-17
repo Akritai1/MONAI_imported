@@ -33,7 +33,6 @@ TEST_CASE_2 = ["model"]
 
 @skip_if_windows
 class TestExportCheckpoint(unittest.TestCase):
-
     def setUp(self):
         self._orig_cuda_env = os.environ.get("CUDA_VISIBLE_DEVICES")
 
@@ -61,14 +60,26 @@ class TestExportCheckpoint(unittest.TestCase):
             save_state(src=net if key_in_ckpt == "" else {key_in_ckpt: net}, path=ckpt_file)
 
             cmd = [
-                "coverage", "run", "-m", "monai.bundle", "export_checkpoint",
-                "network_def", "--filepath", pt2_file,
-                "--meta_file", meta_file,
-                "--config_file", f"['{config_file}','{def_args_file}']",
-                "--ckpt_file", ckpt_file,
-                "--key_in_ckpt", key_in_ckpt,
-                "--args_file", def_args_file,
-                "--input_shape", "[1, 1, 96, 96, 96]",
+                "coverage",
+                "run",
+                "-m",
+                "monai.bundle",
+                "export_checkpoint",
+                "network_def",
+                "--filepath",
+                pt2_file,
+                "--meta_file",
+                meta_file,
+                "--config_file",
+                f"['{config_file}','{def_args_file}']",
+                "--ckpt_file",
+                ckpt_file,
+                "--key_in_ckpt",
+                key_in_ckpt,
+                "--args_file",
+                def_args_file,
+                "--input_shape",
+                "[1, 1, 96, 96, 96]",
             ]
             command_line_tests(cmd)
             self.assertTrue(os.path.exists(pt2_file))
@@ -96,11 +107,19 @@ class TestExportCheckpoint(unittest.TestCase):
 
             # check with default value
             cmd = [
-                "coverage", "run", "-m", "monai.bundle", "export_checkpoint",
-                "--key_in_ckpt", key_in_ckpt,
-                "--config_file", config_file,
-                "--bundle_root", tempdir,
-                "--input_shape", "[1, 1, 96, 96, 96]",
+                "coverage",
+                "run",
+                "-m",
+                "monai.bundle",
+                "export_checkpoint",
+                "--key_in_ckpt",
+                key_in_ckpt,
+                "--config_file",
+                config_file,
+                "--bundle_root",
+                tempdir,
+                "--input_shape",
+                "[1, 1, 96, 96, 96]",
             ]
             command_line_tests(cmd)
             self.assertTrue(os.path.exists(pt2_file))

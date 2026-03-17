@@ -24,7 +24,7 @@ from monai.config import get_config_values
 from monai.data.torchscript_utils import METADATA_FILENAME
 from monai.utils import ExportMetadataKeys
 
-__all__ = ["save_exported_program", "load_exported_program"]
+__all__ = ["load_exported_program", "save_exported_program"]
 
 
 def save_exported_program(
@@ -76,6 +76,8 @@ def save_exported_program(
     extra_files: dict[str, Any] = {METADATA_FILENAME: json_data}
 
     if more_extra_files is not None:
+        if METADATA_FILENAME in more_extra_files:
+            raise ValueError(f"'{METADATA_FILENAME}' is reserved and cannot be used in more_extra_files.")
         extra_files.update(more_extra_files)
 
     # torch.export.save requires str values; decode bytes from legacy callers (e.g. _export helper)
@@ -96,8 +98,7 @@ def save_exported_program(
 
 
 def load_exported_program(
-    filename_prefix_or_stream: str | os.PathLike | IO[bytes],
-    more_extra_files: Sequence[str] = (),
+    filename_prefix_or_stream: str | os.PathLike | IO[bytes], more_extra_files: Sequence[str] = ()
 ) -> tuple[torch.export.ExportedProgram, dict, dict]:
     """
     Load an ``ExportedProgram`` from a ``.pt2`` file and extract stored JSON metadata.

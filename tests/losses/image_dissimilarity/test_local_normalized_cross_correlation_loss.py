@@ -153,11 +153,11 @@ class TestLocalNormalizedCrossCorrelationLoss(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, ""):
             LocalNormalizedCrossCorrelationLoss(reduction=None)(pred, target)
 
-
     def test_export(self):
         input_param, input_data, _ = TEST_CASES[0]
         loss = LocalNormalizedCrossCorrelationLoss(**input_param)
         test_export_save(loss, input_data["pred"], input_data["target"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -206,6 +206,7 @@ def load_from_mmar(
         progress: whether to display a progress bar when downloading the content.
         version: version number of the MMAR. Set it to `-1` to use `item[Keys.VERSION]`.
         map_location: pytorch API parameter for ``torch.load`` or ``torch.jit.load`` (legacy ``.ts`` files).
+            Ignored when loading ``.pt2`` (ExportedProgram) files.
         pretrained: whether to load the pretrained weights after initializing a network module.
         weights_only: whether to load only the weights instead of initializing the network module and assign weights.
         model_key: a key to search in the model file or config file for the model dictionary.

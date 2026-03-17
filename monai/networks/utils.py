@@ -715,7 +715,7 @@ def convert_to_onnx(
         torch_versioned_kwargs = {}
         if use_trace:
             # let torch.onnx.export to trace the model.
-            mode_to_export = model
+            model_to_export = model
             torch_versioned_kwargs = kwargs
             if "dynamo" in kwargs and kwargs["dynamo"] and verify:
                 torch_versioned_kwargs["verify"] = verify
@@ -728,9 +728,9 @@ def convert_to_onnx(
             #   pass the raw nn.Module directly—the exporter handles it via torch.export.
             _pt_major_minor = tuple(int(x) for x in torch.__version__.split("+")[0].split(".")[:2])
             if _pt_major_minor >= (2, 9):
-                mode_to_export = model
+                model_to_export = model
             else:
-                mode_to_export = torch.jit.script(model, **kwargs)
+                model_to_export = torch.jit.script(model, **kwargs)
 
         if torch.is_tensor(inputs) or isinstance(inputs, dict):
             onnx_inputs = (inputs,)
@@ -743,7 +743,7 @@ def convert_to_onnx(
         else:
             f = filename
         torch.onnx.export(
-            mode_to_export,
+            model_to_export,
             onnx_inputs,
             f=f,
             input_names=input_names,
@@ -796,9 +796,11 @@ def convert_to_onnx(
 
 
 def _recursive_to(x, device):
-    """Recursively move tensors (and nested tuples/lists of tensors) to *device*."""
+    """Recursively move tensors (and nested structures of tensors) to *device*."""
     if isinstance(x, torch.Tensor):
         return x.to(device)
+    if isinstance(x, dict):
+        return {k: _recursive_to(v, device) for k, v in x.items()}
     if isinstance(x, (tuple, list)):
         return type(x)(_recursive_to(i, device) for i in x)
     return x
@@ -944,6 +946,8 @@ def convert_to_export(
             export_out = ensure_tuple(loaded_module(*verify_args))
             set_determinism(seed=None)
 
+        if len(torch_out) != len(export_out):
+            raise AssertionError(f"Exported model returned {len(export_out)} outputs, expected {len(torch_out)}.")
         for r1, r2 in zip(torch_out, export_out):
             if isinstance(r1, torch.Tensor) or isinstance(r2, torch.Tensor):
                 torch.testing.assert_close(r1, r2, rtol=rtol, atol=atol)  # type: ignore
@@ -1142,9 +1146,11 @@ def convert_to_trt(
                         **kwargs,
                     )
                 else:
-                    ir_model = convert_to_torchscript(
-                        model, device=target_device, inputs=inputs, use_trace=use_trace
-                    )
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", category=FutureWarning)
+                        ir_model = convert_to_torchscript(
+                            model, device=target_device, inputs=inputs, use_trace=use_trace
+                        )
                     trt_model = torch_tensorrt.compile(
                         ir_model,
                         inputs=input_placeholder,
@@ -1172,6 +1178,8 @@ def convert_to_trt(
             trt_out = ensure_tuple(trt_model(*inputs))
             set_determinism(seed=None)
         # compare TensorRT and PyTorch results
+        if len(torch_out) != len(trt_out):
+            raise AssertionError(f"TRT model returned {len(trt_out)} outputs, expected {len(torch_out)}.")
         for r1, r2 in zip(torch_out, trt_out):
             if isinstance(r1, torch.Tensor) or isinstance(r2, torch.Tensor):
                 torch.testing.assert_close(r1, r2, rtol=rtol, atol=atol)  # type: ignore

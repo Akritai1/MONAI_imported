@@ -29,7 +29,7 @@ from monai.networks.nets import (
     get_efficientnet_image_size,
 )
 from monai.utils import optional_import
-from tests.test_utils import skip_if_downloading_fails, skip_if_quick, test_pretrained_networks, test_export_save
+from tests.test_utils import skip_if_downloading_fails, skip_if_quick, test_export_save, test_pretrained_networks
 
 TESTS_PATH = Path(__file__).parents[2]
 

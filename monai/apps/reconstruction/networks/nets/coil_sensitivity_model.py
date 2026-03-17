@@ -117,7 +117,8 @@ class CoilSensitivityModel(nn.Module):
         acr_1d = (freq_idx >= start) & (freq_idx < start + num_low_freqs)
 
         # Reshape to (..., S, 1) so it broadcasts against masked_kspace
-        return acr_1d.view(*([1] * (mask.ndim - 2)), s_len, 1)
+        result: Tensor = acr_1d.view(*([1] * (mask.ndim - 2)), s_len, 1)
+        return result
 
     def forward(self, masked_kspace: Tensor, mask: Tensor) -> Tensor:
         """

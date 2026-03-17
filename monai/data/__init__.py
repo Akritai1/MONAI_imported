@@ -47,6 +47,7 @@ from .decathlon_datalist import (
     load_decathlon_datalist,
     load_decathlon_properties,
 )
+from .export_utils import load_exported_program, save_exported_program
 from .folder_layout import FolderLayout, FolderLayoutBase
 from .grid_dataset import GridPatchDataset, PatchDataset, PatchIter, PatchIterd
 from .image_dataset import ImageDataset
@@ -77,7 +78,6 @@ from .synthetic import create_test_image_2d, create_test_image_3d
 from .test_time_augmentation import TestTimeAugmentation
 from .thread_buffer import ThreadBuffer, ThreadDataLoader
 from .torchscript_utils import load_net_with_metadata, save_net_with_metadata
-from .export_utils import load_exported_program, save_exported_program
 from .utils import (
     affine_to_spacing,
     compute_importance_map,

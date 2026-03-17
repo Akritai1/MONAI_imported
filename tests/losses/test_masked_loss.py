@@ -19,7 +19,7 @@ from parameterized import parameterized
 from monai.losses.dice import DiceFocalLoss, DiceLoss
 from monai.losses.spatial_mask import MaskedLoss
 from monai.utils import set_determinism
-from tests.test_utils import test_export_save
+from tests.test_utils import test_script_save
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -73,14 +73,14 @@ class TestMaskedLoss(unittest.TestCase):
             masked = MaskedLoss(loss=dice_loss)
             masked(input=torch.zeros((3, 3, 2, 2)), target=torch.zeros((3, 2, 2, 2)), mask=torch.zeros((3, 3, 2, 2)))
 
-    def test_export(self):
+    def test_script(self):
         input_param, expected_val = TEST_CASES[0]
         size = [3, 3, 5, 5]
         label = torch.randint(low=0, high=2, size=size)
         label = torch.argmax(label, dim=1, keepdim=True)
         pred = torch.randn(size)
         loss = MaskedLoss(**input_param)
-        test_export_save(loss, pred, label)
+        test_script_save(loss, pred, label)
 
 
 if __name__ == "__main__":

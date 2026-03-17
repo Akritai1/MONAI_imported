@@ -30,7 +30,6 @@ class TestModule(torch.nn.Module):
 
 
 class TestExportUtils(unittest.TestCase):
-
     def test_save_exported_program(self):
         """Save an exported program without metadata to a file."""
         ep = torch.export.export(TestModule(), args=(torch.tensor(1.0),))

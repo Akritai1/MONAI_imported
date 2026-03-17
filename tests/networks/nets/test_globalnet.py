@@ -21,7 +21,7 @@ from monai.networks import eval_mode
 from monai.networks.blocks import Warp
 from monai.networks.nets import GlobalNet
 from monai.networks.nets.regunet import AffineHead
-from tests.test_utils import assert_allclose, test_export_save
+from tests.test_utils import assert_allclose, test_script_save
 
 TEST_CASES_AFFINE_TRANSFORM = [
     [
@@ -92,11 +92,11 @@ class TestGlobalNet(unittest.TestCase):
             # testing initial pred identity
             np.testing.assert_allclose(warped.detach().cpu().numpy(), img.detach().cpu().numpy(), rtol=1e-4, atol=1e-4)
 
-    @parameterized.expand([c for c in TEST_CASES_GLOBAL_NET if not c[0].get("save_theta")])
-    def test_export(self, input_param, input_shape, _):
+    @parameterized.expand(TEST_CASES_GLOBAL_NET)
+    def test_script(self, input_param, input_shape, _):
         net = GlobalNet(**input_param)
         test_data = torch.randn(input_shape)
-        test_export_save(net, test_data)
+        test_script_save(net, test_data)
 
 
 if __name__ == "__main__":

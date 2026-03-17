@@ -45,7 +45,7 @@ class TestVarNet(unittest.TestCase):
         self.assertEqual(result.shape, expected_shape)
 
     @parameterized.expand(TESTS)
-    def test_export(self, coil_sens_model, refinement_model, num_cascades, input_shape, expected_shape):
+    def test_export(self, coil_sens_model, refinement_model, num_cascades, input_shape, _expected_shape):
         net = VariationalNetworkModel(coil_sens_model, refinement_model, num_cascades)
 
         mask_shape = [1 for _ in input_shape]

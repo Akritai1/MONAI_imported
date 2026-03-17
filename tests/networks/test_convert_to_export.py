@@ -19,10 +19,11 @@ import torch
 
 from monai.networks import convert_to_export
 from monai.networks.nets import UNet
+from monai.utils.module import pytorch_after
 
 
+@unittest.skipUnless(pytorch_after(2, 6), "torch.export requires PyTorch >= 2.6")
 class TestConvertToExport(unittest.TestCase):
-
     def test_basic_export(self):
         """Export a UNet and verify output matches."""
         model = UNet(
@@ -45,10 +46,7 @@ class TestConvertToExport(unittest.TestCase):
         model = UNet(
             spatial_dims=2, in_channels=1, out_channels=3, channels=(16, 32, 64), strides=(2, 2), num_res_units=0
         )
-        exported = convert_to_export(
-            model=model,
-            inputs=[torch.randn((2, 1, 32, 32))],
-        )
+        exported = convert_to_export(model=model, inputs=[torch.randn((2, 1, 32, 32))])
         self.assertIsInstance(exported, torch.export.ExportedProgram)
         out = exported.module()(torch.randn(2, 1, 32, 32))
         self.assertEqual(out.shape, torch.Size([2, 3, 32, 32]))
@@ -61,17 +59,16 @@ class TestConvertToExport(unittest.TestCase):
         with self.assertRaises(ValueError):
             convert_to_export(model=model)
 
+    @unittest.skipUnless(pytorch_after(2, 9), "torch.export.Dim.DYNAMIC requires PyTorch >= 2.9")
     def test_export_with_dynamic_shapes(self):
         """Export with dynamic batch dimension."""
         model = UNet(
             spatial_dims=2, in_channels=1, out_channels=3, channels=(16, 32, 64), strides=(2, 2), num_res_units=0
         )
-        D = torch.export.Dim.DYNAMIC
-        S = torch.export.Dim.STATIC
+        dynamic = torch.export.Dim.DYNAMIC
+        static = torch.export.Dim.STATIC
         exported = convert_to_export(
-            model=model,
-            inputs=[torch.randn((2, 1, 32, 32))],
-            dynamic_shapes=((D, S, D, D),),
+            model=model, inputs=[torch.randn((2, 1, 32, 32))], dynamic_shapes=((dynamic, static, dynamic, dynamic),)
         )
         # Verify works with different batch size and spatial dims
         out = exported.module()(torch.randn(4, 1, 64, 64))

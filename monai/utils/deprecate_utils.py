@@ -30,7 +30,6 @@ class DeprecatedError(Exception):
     pass
 
 
-
 def deprecated(
     since: str | None = None,
     removed: str | None = None,

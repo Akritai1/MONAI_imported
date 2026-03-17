@@ -779,7 +779,11 @@ def test_export_save(net, *inputs, dynamic_shapes=None, rtol=1e-4, atol=0.0):
     Test the ability to save ``net`` as a ``torch.export`` ``.pt2`` object, reload it, and apply inference.
     The value ``inputs`` is forward-passed through the original and loaded copy of the network and their
     results returned. The forward pass for both is done without gradient accumulation.
+
+    Requires PyTorch >= 2.6.0. Skips silently on older versions.
     """
+    if not pytorch_after(2, 6):
+        return
     device = "cpu"
     # Ensure model and inputs are on CPU to avoid device mismatches in exported constants
     net = net.to(device)
@@ -797,7 +801,7 @@ def test_export_save(net, *inputs, dynamic_shapes=None, rtol=1e-4, atol=0.0):
         )
 
 
-test_export_save.__test__ = False  # prevent pytest from collecting this helper as a test
+test_export_save.__test__ = False  # type: ignore[attr-defined]  # prevent pytest from collecting this helper
 
 
 def test_onnx_save(net, *inputs, device=None, rtol=1e-4, atol=0.0):

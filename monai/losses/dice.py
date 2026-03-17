@@ -123,8 +123,11 @@ class DiceLoss(_Loss):
         self.smooth_dr = float(smooth_dr)
         self.batch = batch
         weight = torch.as_tensor(weight) if weight is not None else None
-        if weight is not None and weight.min() < 0:
-            raise ValueError("the value/values of the `weight` should be no less than 0.")
+        if weight is not None:
+            if weight.numel() == 0:
+                raise ValueError("`weight` must not be empty.")
+            if weight.min() < 0:
+                raise ValueError("the value/values of the `weight` should be no less than 0.")
         self.register_buffer("class_weight", weight)
         self.class_weight: None | torch.Tensor
         self.soft_label = soft_label
