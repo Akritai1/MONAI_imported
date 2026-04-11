@@ -47,7 +47,8 @@ from monai.config.deviceconfig import USE_COMPILED
 from monai.config.type_definitions import NdarrayOrTensor
 from monai.data import create_test_image_2d, create_test_image_3d
 from monai.data.meta_tensor import MetaTensor, get_track_meta
-from monai.networks import convert_to_onnx, convert_to_torchscript
+from monai.networks import convert_to_export, convert_to_onnx, convert_to_torchscript
+from monai.networks.utils import _recursive_to
 from monai.utils import optional_import
 from monai.utils.misc import MONAIEnvVars
 from monai.utils.module import compute_capabilities_after, pytorch_after
@@ -771,6 +772,36 @@ def test_script_save(net, *inputs, device=None, rtol=1e-4, atol=0.0):
             rtol=rtol,
             atol=atol,
         )
+
+
+def test_export_save(net, *inputs, dynamic_shapes=None, rtol=1e-4, atol=0.0):
+    """
+    Test the ability to save ``net`` as a ``torch.export`` ``.pt2`` object, reload it, and apply inference.
+    The value ``inputs`` is forward-passed through the original and loaded copy of the network and their
+    results returned. The forward pass for both is done without gradient accumulation.
+
+    Requires PyTorch >= 2.6.0. Skips silently on older versions.
+    """
+    if not pytorch_after(2, 6):
+        return
+    device = "cpu"
+    # Ensure model and inputs are on CPU to avoid device mismatches in exported constants
+    net = net.to(device)
+    inputs = tuple(_recursive_to(i, device) for i in inputs)
+    with tempfile.TemporaryDirectory() as tempdir:
+        convert_to_export(
+            model=net,
+            filename_or_obj=os.path.join(tempdir, "model.pt2"),
+            verify=True,
+            inputs=inputs,
+            dynamic_shapes=dynamic_shapes,
+            device=device,
+            rtol=rtol,
+            atol=atol,
+        )
+
+
+test_export_save.__test__ = False  # type: ignore[attr-defined]  # prevent pytest from collecting this helper
 
 
 def test_onnx_save(net, *inputs, device=None, rtol=1e-4, atol=0.0):

@@ -205,7 +205,8 @@ def load_from_mmar(
         mmar_dir: : target directory to store the MMAR, default is mmars subfolder under `torch.hub get_dir()`.
         progress: whether to display a progress bar when downloading the content.
         version: version number of the MMAR. Set it to `-1` to use `item[Keys.VERSION]`.
-        map_location: pytorch API parameter for `torch.load` or `torch.jit.load`.
+        map_location: pytorch API parameter for ``torch.load`` or ``torch.jit.load`` (legacy ``.ts`` files).
+            Ignored when loading ``.pt2`` (ExportedProgram) files.
         pretrained: whether to load the pretrained weights after initializing a network module.
         weights_only: whether to load only the weights instead of initializing the network module and assign weights.
         model_key: a key to search in the model file or config file for the model dictionary.
@@ -232,12 +233,26 @@ def load_from_mmar(
     _model_file = model_dir / item.get(Keys.MODEL_FILE, model_file)
     logger.info(f'\n*** "{item.get(Keys.NAME)}" available at {model_dir}.')
 
-    # loading with `torch.jit.load`
-    if _model_file.name.endswith(".ts"):
+    # loading with `torch.export.load` for .pt2 files
+    if _model_file.name.endswith(".pt2"):
         if not pretrained:
-            warnings.warn("Loading a ScriptModule, 'pretrained' option ignored.")
+            warnings.warn("Loading an ExportedProgram, 'pretrained' option ignored.", stacklevel=2)
         if weights_only:
-            warnings.warn("Loading a ScriptModule, 'weights_only' option ignored.")
+            warnings.warn("Loading an ExportedProgram, 'weights_only' option ignored.", stacklevel=2)
+        return torch.export.load(str(_model_file))
+
+    # loading with `torch.jit.load` for legacy .ts files
+    if _model_file.name.endswith(".ts"):
+        warnings.warn(
+            "Loading TorchScript (.ts) models is deprecated since MONAI v1.5 and will be removed in v1.7. "
+            "Use torch.export (.pt2) format instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        if not pretrained:
+            warnings.warn("Loading a ScriptModule, 'pretrained' option ignored.", stacklevel=2)
+        if weights_only:
+            warnings.warn("Loading a ScriptModule, 'weights_only' option ignored.", stacklevel=2)
         return torch.jit.load(_model_file, map_location=map_location)
 
     # loading with `torch.load`

@@ -81,8 +81,7 @@ class ChannelSELayer(nn.Module):
         y = self.fc(y).view([b, c] + [1] * (x.ndim - 2))
         result = x * y
 
-        # Residual connection is moved here instead of providing an override of forward in ResidualSELayer since
-        # Torchscript has an issue with using super().
+        # Residual connection is applied here rather than in a forward override in ResidualSELayer.
         if self.add_residual:
             result += x
 

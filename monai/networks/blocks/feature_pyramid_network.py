@@ -206,7 +206,7 @@ class FeaturePyramidNetwork(nn.Module):
     def get_result_from_inner_blocks(self, x: Tensor, idx: int) -> Tensor:
         """
         This is equivalent to self.inner_blocks[idx](x),
-        but torchscript doesn't support this yet
+        but module indexing with a variable is used for compatibility
         """
         num_blocks = len(self.inner_blocks)
         if idx < 0:
@@ -220,7 +220,7 @@ class FeaturePyramidNetwork(nn.Module):
     def get_result_from_layer_blocks(self, x: Tensor, idx: int) -> Tensor:
         """
         This is equivalent to self.layer_blocks[idx](x),
-        but torchscript doesn't support this yet
+        but module indexing with a variable is used for compatibility
         """
         num_blocks = len(self.layer_blocks)
         if idx < 0:

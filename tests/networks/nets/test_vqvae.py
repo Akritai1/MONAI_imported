@@ -125,8 +125,8 @@ class TestVQVAE(unittest.TestCase):
 
         self.assertEqual(result.shape, expected_shape)
 
-    # Removed this test case since TorchScript currently does not support activation checkpoint.
-    # def test_script(self):
+    # Removed this test case since torch.export does not support activation checkpoint.
+    # def test_export(self):
     #     net = VQVAE(
     #         spatial_dims=2,
     #         in_channels=1,
@@ -141,7 +141,7 @@ class TestVQVAE(unittest.TestCase):
     #         ddp_sync=False,
     #     )
     #     test_data = torch.randn(1, 1, 16, 16)
-    #     test_script_save(net, test_data)
+    #     test_export_save(net, test_data)
 
     def test_channels_not_same_size_of_num_res_channels(self):
         with self.assertRaises(ValueError):

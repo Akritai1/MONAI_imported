@@ -30,13 +30,6 @@ class DeprecatedError(Exception):
     pass
 
 
-def warn_deprecated(obj, msg, warning_category=FutureWarning):
-    """
-    Issue the warning message `msg`.
-    """
-    warnings.warn(f"{obj}: {msg}", category=warning_category, stacklevel=2)
-
-
 def deprecated(
     since: str | None = None,
     removed: str | None = None,
@@ -107,7 +100,7 @@ def deprecated(
             if is_removed:
                 raise DeprecatedError(msg)
             if is_deprecated:
-                warn_deprecated(obj, msg, warning_category)
+                warnings.warn(f"{obj}: {msg}", category=warning_category, stacklevel=2)
 
             return call_obj(*args, **kwargs)
 
@@ -217,7 +210,7 @@ def deprecated_arg(
                 if is_removed:
                     raise DeprecatedError(msg)
                 if is_deprecated:
-                    warn_deprecated(argname, msg, warning_category)
+                    warnings.warn(f"{argname}: {msg}", category=warning_category, stacklevel=2)
 
             return func(*args, **kwargs)
 
@@ -317,7 +310,7 @@ def deprecated_arg_default(
         def _wrapper(*args, **kwargs):
             if name not in sig.bind(*args, **kwargs).arguments and is_deprecated:
                 # arg was not found so the default value is used
-                warn_deprecated(argname, msg, warning_category)
+                warnings.warn(f"{argname}: {msg}", category=warning_category, stacklevel=2)
 
             return func(*args, **kwargs)
 
