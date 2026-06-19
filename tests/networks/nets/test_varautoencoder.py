@@ -122,6 +122,28 @@ class TestVarAutoEncoder(unittest.TestCase):
         test_data = torch.randn(2, 1, 32, 32)
         test_script_save(net, test_data, rtol=1e-3, atol=1e-3)
 
+    def test_reparameterize_eval_returns_mu(self):
+        # At eval the latent code must equal mu (deterministic, no noise added);
+        # at train it must be stochastic. Regression test for #8413, where eval
+        # returned mu + std.
+        net = VarAutoEncoder(
+            spatial_dims=2, in_shape=(1, 32, 32), out_channels=1, latent_size=4, channels=(4, 8), strides=(2, 2)
+        ).to(device)
+        data = torch.randn(2, 1, 32, 32).to(device)
+
+        with eval_mode(net):
+            _, mu1, _, z1 = net(data)
+            _, _, _, z2 = net(data)
+        self.assertTrue(torch.allclose(z1, mu1))
+        self.assertTrue(torch.allclose(z1, z2))
+
+        net.train()
+        with torch.no_grad():
+            _, mu_t, _, zt1 = net(data)
+            _, _, _, zt2 = net(data)
+        self.assertFalse(torch.allclose(zt1, mu_t))
+        self.assertFalse(torch.allclose(zt1, zt2))
+
 
 if __name__ == "__main__":
     unittest.main()

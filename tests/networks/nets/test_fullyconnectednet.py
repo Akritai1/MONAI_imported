@@ -64,6 +64,27 @@ class TestFullyConnectedNet(unittest.TestCase):
             result = net.forward(torch.randn(input_shape).to(device))[0]
             self.assertEqual(result.shape, expected_shape)
 
+    def test_vfc_reparameterize_eval_returns_mu(self):
+        # At eval the latent code must equal mu (deterministic); at train it must
+        # be stochastic. Same #8413 reparameterize bug as VarAutoEncoder.
+        net = VarFullyConnectedNet(
+            in_channels=10, out_channels=10, latent_size=30, encode_channels=(15, 20, 25), decode_channels=(15, 20, 25)
+        ).to(device)
+        data = torch.randn(3, 10).to(device)
+
+        with eval_mode(net):
+            _, mu1, _, z1 = net(data)
+            _, _, _, z2 = net(data)
+        self.assertTrue(torch.allclose(z1, mu1))
+        self.assertTrue(torch.allclose(z1, z2))
+
+        net.train()
+        with torch.no_grad():
+            _, mu_t, _, zt1 = net(data)
+            _, _, _, zt2 = net(data)
+        self.assertFalse(torch.allclose(zt1, mu_t))
+        self.assertFalse(torch.allclose(zt1, zt2))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -142,12 +142,13 @@ class VarAutoEncoder(AutoEncoder):
         return x
 
     def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+        if not self.training:
+            # At inference the latent code is the posterior mean; the random
+            # term is only added during training (the reparameterization trick).
+            return mu
         std = torch.exp(0.5 * logvar)
-
-        if self.training:  # multiply random noise with std only during training
-            std = torch.randn_like(std).mul(std)
-
-        return std.add_(mu)
+        eps = torch.randn_like(std)
+        return mu + eps * std
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         mu, logvar = self.encode_forward(x)
