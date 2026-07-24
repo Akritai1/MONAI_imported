@@ -39,14 +39,18 @@ from monai.transforms.utils import (
 )
 from monai.transforms.utils_pytorch_numpy_unification import unravel_index
 from monai.utils import (
+    OptionalImportError,
     TransformBackends,
     convert_data_type,
     convert_to_tensor,
     ensure_tuple,
     get_equivalent_dtype,
     look_up_option,
+    optional_import,
 )
 from monai.utils.type_conversion import convert_to_dst_type
+
+rankseg_fn, has_rankseg = optional_import("rankseg.functional", name="rankseg")
 
 __all__ = [
     "Activations",
@@ -142,6 +146,7 @@ class AsDiscrete(Transform):
     Convert the input tensor/array into discrete values, possible operations are:
 
         -  `argmax`.
+        -  `rankseg`.
         -  threshold input value to binary values.
         -  convert input value to One-Hot format (set ``to_one_hot=N``, `N` is the number of classes).
         -  round the value to the closest integer.
@@ -155,9 +160,15 @@ class AsDiscrete(Transform):
             Defaults to ``None``.
         rounding: if not None, round the data according to the specified option,
             available options: ["torchrounding"].
+        rankseg: whether to use RankSEG to decode an image's class probability map into a segmentation label map.
+            RankSEG is an inference-time decoder that maximizes the expected samplewise Dice or IoU.
+            The class dimension is specified by ``dim``;
+            ``keepdim`` follows the same output-shape convention as ``argmax``. Requires the optional ``rankseg``
+            package and is incompatible with ``argmax=True``.
+            Defaults to ``False``.
         kwargs: additional parameters to `torch.argmax`, `monai.networks.one_hot`.
-            currently ``dim``, ``keepdim``, ``dtype`` are supported, unrecognized parameters will be ignored.
-            These default to ``0``, ``True``, ``torch.float`` respectively.
+            currently ``dim``, ``keepdim``, ``dtype``, and RankSEG ``metric`` are supported, unrecognized parameters
+            will be ignored. These default to ``0``, ``True``, ``torch.float``, and ``"dice"`` respectively.
 
     Example:
 
@@ -173,6 +184,12 @@ class AsDiscrete(Transform):
         >>> print(transform(np.array([[[0.0, 1.0]], [[2.0, 3.0]]])))
         # [[[0.0, 0.0]], [[1.0, 1.0]]]
 
+        RankSEG decoding requires the optional ``rankseg`` package:
+
+        >>> transform = AsDiscrete(rankseg=True)
+        >>> print(transform(np.array([[[0.3, 0.6]], [[0.7, 0.4]]])))
+        # [[[1.0, 1.0]]]
+
     """
 
     backend = [TransformBackends.TORCH]
@@ -183,9 +200,15 @@ class AsDiscrete(Transform):
         to_onehot: int | None = None,
         threshold: float | None = None,
         rounding: str | None = None,
+        rankseg: bool = False,
         **kwargs,
     ) -> None:
+        if argmax and rankseg:
+            raise ValueError("`rankseg=True` is incompatible with `argmax=True`.")
+        if rankseg and not has_rankseg:
+            raise OptionalImportError("`rankseg=True` requires the `rankseg` package, but it is not installed.")
         self.argmax = argmax
+        self.rankseg = rankseg
         if isinstance(to_onehot, bool):  # for backward compatibility
             raise ValueError("`to_onehot=True/False` is deprecated, please use `to_onehot=num_classes` instead.")
         self.to_onehot = to_onehot
@@ -200,6 +223,7 @@ class AsDiscrete(Transform):
         to_onehot: int | None = None,
         threshold: float | None = None,
         rounding: str | None = None,
+        rankseg: bool | None = None,
     ) -> NdarrayOrTensor:
         """
         Args:
@@ -211,6 +235,11 @@ class AsDiscrete(Transform):
                 Defaults to ``self.to_onehot``.
             threshold: if not None, threshold the float values to int number 0 or 1 with specified threshold value.
                 Defaults to ``self.threshold``.
+            rankseg: whether to apply RankSEG decoding. Requires installing the optional ``rankseg`` package.
+                Applies RankSEG to a channel-first probability map by default and uses the same ``dim`` and
+                ``keepdim`` shape handling as ``argmax``. The RankSEG ``metric`` can be specified in ``kwargs``.
+                This option is incompatible with ``argmax=True``.
+                Defaults to ``self.rankseg``.
             rounding: if not None, round the data according to the specified option,
                 available options: ["torchrounding"].
 
@@ -220,8 +249,25 @@ class AsDiscrete(Transform):
         img = convert_to_tensor(img, track_meta=get_track_meta())
         img_t, *_ = convert_data_type(img, torch.Tensor)
         argmax = self.argmax if argmax is None else argmax
+        rankseg = self.rankseg if rankseg is None else rankseg
+
+        if argmax and rankseg:
+            raise ValueError("`rankseg=True` is incompatible with `argmax=True`.")
+
         if argmax:
             img_t = torch.argmax(img_t, dim=self.kwargs.get("dim", 0), keepdim=self.kwargs.get("keepdim", True))
+
+        if rankseg:
+            if not has_rankseg:
+                raise OptionalImportError("`rankseg=True` requires the `rankseg` package, but it is not installed.")
+            # Adjust shape to meet RankSEG's [B, C, *spatial] input requirement.
+            channel_dim = self.kwargs.get("dim", 0) % img_t.ndim
+            keepdim = self.kwargs.get("keepdim", True)
+            img_t = rankseg_fn(
+                img_t.movedim(channel_dim, 0).unsqueeze(0), metric=self.kwargs.get("metric", "dice")
+            ).squeeze(0)
+            if keepdim:
+                img_t = img_t.unsqueeze(channel_dim)
 
         to_onehot = self.to_onehot if to_onehot is None else to_onehot
         if to_onehot is not None:

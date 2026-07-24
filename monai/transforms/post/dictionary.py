@@ -166,6 +166,7 @@ class AsDiscreted(MapTransform):
         to_onehot: Sequence[int | None] | int | None = None,
         threshold: Sequence[float | None] | float | None = None,
         rounding: Sequence[str | None] | str | None = None,
+        rankseg: Sequence[bool] | bool = False,
         allow_missing_keys: bool = False,
         **kwargs,
     ) -> None:
@@ -182,14 +183,19 @@ class AsDiscreted(MapTransform):
             rounding: if not None, round the data according to the specified option,
                 available options: ["torchrounding"]. it also can be a sequence of str or None,
                 each element corresponds to a key in ``keys``.
+            rankseg: whether to apply RankSEG decoding. See :py:class:`monai.transforms.AsDiscrete` for details.
+                It can also be a sequence of bool, each element corresponding to a key in ``keys``.
             allow_missing_keys: don't raise exception if key is missing.
             kwargs: additional parameters to ``AsDiscrete``.
-                ``dim``, ``keepdim``, ``dtype`` are supported, unrecognized parameters will be ignored.
-                These default to ``0``, ``True``, ``torch.float`` respectively.
+                ``dim``, ``keepdim``, ``dtype``, and RankSEG ``metric`` are supported, unrecognized parameters will
+                be ignored. These default to ``0``, ``True``, ``torch.float``, and ``"dice"`` respectively.
 
         """
         super().__init__(keys, allow_missing_keys)
         self.argmax = ensure_tuple_rep(argmax, len(self.keys))
+        self.rankseg = ensure_tuple_rep(rankseg, len(self.keys))
+        if any(argmax_ and rankseg_ for argmax_, rankseg_ in zip(self.argmax, self.rankseg, strict=True)):
+            raise ValueError("`rankseg=True` is incompatible with `argmax=True`.")
         self.to_onehot = []
         for flag in ensure_tuple_rep(to_onehot, len(self.keys)):
             if isinstance(flag, bool):
@@ -208,10 +214,12 @@ class AsDiscreted(MapTransform):
 
     def __call__(self, data: Mapping[Hashable, NdarrayOrTensor]) -> dict[Hashable, NdarrayOrTensor]:
         d = dict(data)
-        for key, argmax, to_onehot, threshold, rounding in self.key_iterator(
-            d, self.argmax, self.to_onehot, self.threshold, self.rounding
+        for key, argmax, to_onehot, threshold, rounding, rankseg in self.key_iterator(
+            d, self.argmax, self.to_onehot, self.threshold, self.rounding, self.rankseg
         ):
-            d[key] = self.converter(d[key], argmax, to_onehot, threshold, rounding)
+            d[key] = self.converter(
+                d[key], argmax=argmax, to_onehot=to_onehot, threshold=threshold, rounding=rounding, rankseg=rankseg
+            )
         return d
 
 
