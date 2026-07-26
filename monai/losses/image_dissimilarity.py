@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import math
+
 import torch
 from torch.nn import functional as F
 from torch.nn.modules.loss import _Loss
@@ -236,10 +238,18 @@ class GlobalMutualInformationLoss(_Loss):
         # gaussian kernel, hence the ``Tensor`` annotation reflects the type at the use sites in that path.
         self.preterm: torch.Tensor | None
         self.bin_centers: torch.Tensor | None
+        self._preterm_value: float | None = None
         self.register_buffer("preterm", None, persistent=False)
         self.register_buffer("bin_centers", None, persistent=False)
         if self.kernel_type == "gaussian":
-            self.register_buffer("preterm", 1 / (2 * sigma**2), persistent=False)
+            preterm = 1 / (2 * sigma**2)
+            preterm_value = float(preterm)
+            if not math.isfinite(preterm_value) and num_bins > 1 and sigma_ratio != 0.0:
+                preterm_value = (num_bins - 1) ** 2 / (2.0 * sigma_ratio**2)
+            if not bool(torch.isfinite(preterm)):
+                preterm = torch.as_tensor(preterm_value, dtype=torch.float32)
+            self._preterm_value = preterm_value
+            self.register_buffer("preterm", preterm, persistent=False)
             self.register_buffer("bin_centers", bin_centers[None, None, ...], persistent=False)
         self.smooth_nr = float(smooth_nr)
         self.smooth_dr = float(smooth_dr)
@@ -316,16 +326,33 @@ class GlobalMutualInformationLoss(_Loss):
         Note: the input is expected to range between 0 and 1
         Args:
             img: the shape should be B[NDHW].
+
+        Returns:
+            A tuple containing per-sample Gaussian bin weights and the
+            corresponding marginal probability.
+
+        Raises:
+            ValueError: if the Gaussian kernel buffers are unavailable.
         """
-        img = torch.clamp(img, 0, 1)
+        output_dtype = img.dtype
+        compute_dtype = torch.float32 if output_dtype in (torch.float16, torch.bfloat16) else output_dtype
+        img = torch.clamp(img.to(dtype=compute_dtype), 0, 1)
         img = img.reshape(img.shape[0], -1, 1)  # (batch, num_sample, 1)
-        if self.bin_centers is None or self.preterm is None:
+        if self.bin_centers is None or self.preterm is None or self._preterm_value is None:
             raise ValueError("bin_centers and preterm must be defined for gaussian parzen windowing.")
-        weight = torch.exp(
-            -self.preterm.to(img) * (img - self.bin_centers.to(img)) ** 2
-        )  # (batch, num_sample, num_bin)
+        preterm = self.preterm.to(device=img.device, dtype=compute_dtype)
+        preterm = torch.where(
+            torch.isfinite(preterm),
+            preterm,
+            torch.as_tensor(self._preterm_value, device=img.device, dtype=compute_dtype),
+        )
+        bin_centers = self.bin_centers.to(device=img.device, dtype=compute_dtype)
+        weight = torch.exp(-preterm * (img - bin_centers) ** 2)  # (batch, num_sample, num_bin)
         weight = weight / torch.sum(weight, dim=-1, keepdim=True)  # (batch, num_sample, num_bin)
         probability = torch.mean(weight, dim=-2, keepdim=True)  # (batch, 1, num_bin)
+        if output_dtype in (torch.float16, torch.bfloat16):
+            weight = weight.to(dtype=output_dtype)
+            probability = probability.to(dtype=output_dtype)
         return weight, probability
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -333,23 +360,49 @@ class GlobalMutualInformationLoss(_Loss):
         Args:
             pred: the shape should be B[NDHW].
             target: the shape should be same as the pred shape.
+        Returns:
+            Reduced negative mutual information loss.
+
         Raises:
-            ValueError: When ``self.reduction`` is not one of ["mean", "sum", "none"].
+            ValueError: if ``pred`` and ``target`` have different shapes, or
+                if ``self.reduction`` is not one of ``"mean"``, ``"sum"``,
+                or ``"none"``.
         """
         if target.shape != pred.shape:
             raise ValueError(f"ground truth has differing shape ({target.shape}) from pred ({pred.shape})")
         wa, pa, wb, pb = self.parzen_windowing(pred, target)  # (batch, num_sample, num_bin), (batch, 1, num_bin)
 
-        pab = torch.bmm(wa.permute(0, 2, 1), wb.to(wa)).div(wa.shape[1])  # (batch, num_bins, num_bins)
-        papb = torch.bmm(pa.permute(0, 2, 1), pb.to(pa))  # (batch, num_bins, num_bins)
+        # A half-precision matrix product can overflow while accumulating the
+        # unnormalized joint histogram. Eager execution disables autocast for
+        # this operation. TorchScript cannot compile a dynamic autocast device,
+        # so it computes the normalized histogram directly by scaling both
+        # operands by sqrt(N).
+        output_dtype = wa.dtype
+        compute_dtype = torch.float32 if wa.dtype in (torch.float16, torch.bfloat16) else wa.dtype
+        wa = wa.to(dtype=compute_dtype)
+        wb = wb.to(wa)
+        pa = pa.to(dtype=compute_dtype)
+        pb = pb.to(pa)
+        if torch.jit.is_scripting():
+            sample_scale = float(wa.shape[1]) ** 0.5
+            pab = torch.bmm((wa / sample_scale).permute(0, 2, 1), wb / sample_scale).to(
+                dtype=compute_dtype
+            )  # (batch, num_bins, num_bins)
+            papb = torch.bmm(pa.permute(0, 2, 1), pb).to(dtype=compute_dtype)  # (batch, num_bins, num_bins)
+        else:
+            with torch.autocast(device_type=wa.device.type, enabled=False):
+                pab = torch.bmm(wa.permute(0, 2, 1), wb).div(wa.shape[1])  # (batch, num_bins, num_bins)
+                papb = torch.bmm(pa.permute(0, 2, 1), pb)  # (batch, num_bins, num_bins)
         mi = torch.sum(
             pab * torch.log((pab + self.smooth_nr) / (papb + self.smooth_dr) + self.smooth_dr), dim=(1, 2)
         )  # (batch)
 
         if self.reduction == LossReduction.SUM.value:
-            return torch.sum(mi).neg()  # sum over the batch and channel ndims
-        if self.reduction == LossReduction.NONE.value:
-            return mi.neg()
-        if self.reduction == LossReduction.MEAN.value:
-            return torch.mean(mi).neg()  # average over the batch and channel ndims
-        raise ValueError(f'Unsupported reduction: {self.reduction}, available options are ["mean", "sum", "none"].')
+            loss = torch.sum(mi).neg()  # sum over the batch and channel ndims
+        elif self.reduction == LossReduction.NONE.value:
+            loss = mi.neg()
+        elif self.reduction == LossReduction.MEAN.value:
+            loss = torch.mean(mi).neg()  # average over the batch and channel ndims
+        else:
+            raise ValueError(f'Unsupported reduction: {self.reduction}, available options are ["mean", "sum", "none"].')
+        return loss.to(dtype=output_dtype)
