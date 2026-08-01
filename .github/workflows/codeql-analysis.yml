@@ -17,6 +17,13 @@ on:
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ dev ]
+    paths-ignore:  # skip if only docs are modified
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
+      - '.specify/**'
+      - '.cursor/**'
+      
   schedule:
     - cron: '18 1 * * 0'
 
