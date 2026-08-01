@@ -20,6 +20,8 @@ on:
       - '**.md'
       - '**.rst'
       - 'docs/**'
+      - '.specify/**'
+      - '.cursor/**'
 
 concurrency:
   # automatically cancel the previously triggered workflows when there's a newer version
