@@ -23,7 +23,7 @@ on:
       - 'docs/**'
       - '.specify/**'
       - '.cursor/**'
-      
+      - 'specs/**'
   schedule:
     - cron: '18 1 * * 0'
 
