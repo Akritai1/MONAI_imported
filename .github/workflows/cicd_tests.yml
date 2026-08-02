@@ -11,6 +11,9 @@ on:
       - '**.md'
       - '**.rst'
       - 'docs/**'
+      - '.specify/**'
+      - '.cursor/**'
+      - 'specs/**'
   pull_request:
     branches:
       - dev
@@ -22,6 +25,7 @@ on:
       - 'docs/**'
       - '.specify/**'
       - '.cursor/**'
+      - 'specs/**'
 
 concurrency:
   # automatically cancel the previously triggered workflows when there's a newer version
